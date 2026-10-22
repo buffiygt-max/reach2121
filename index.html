@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sasniedz 21: Blockchain duelis</title>
+    <!-- Import Ethers.js for Web3 functionality -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .box { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 5px; }
+        button { padding: 10px 15px; margin: 5px 0; cursor: pointer; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Sasniedz 21: Blockchain duelis</h1>
+    
+    <div class="box">
+        <button id="connectBtn">Connect MetaMask</button>
+        <p>Wallet: <span id="walletAddress">Not connected</span></p>
+    </div>
+
+    <div class="box">
+        <h3>Game Status: <span id="gameStatus">Unknown</span></h3>
+        <p>Current Sum: <b id="currentSum">0</b> / <span id="target">21</span></p>
+        <p>Player 1: <span id="player1">-</span></p>
+        <p>Player 2: <span id="player2">-</span></p>
+        <p>Whose Turn: <b id="turnOwner">-</b></p>
+    </div>
+
+    <div class="box">
+        <h3>Actions</h3>
+        <button id="createBtn">Create Game (Target 21)</button>
+        <button id="joinBtn">Join Game</button>
+        <hr>
+        <button id="add1Btn">Add +1</button>
+        <button id="add2Btn">Add +2</button>
+        <button id="add3Btn">Add +3</button>
+    </div>
+
+    <script>
+        const contractAddress = "0x0Fe611c4cD63b92e5472A9696b6ABc2647677f8d"; 
+        
+        // This is the ABI (interface) so JavaScript knows how to talk to your Solidity contract
+        const contractABI = [
+            "function createGame(uint8 _target) public",
+            "function joinGame() public",
+            "function makeMove(uint8 amount) public",
+            "function getGame() public view returns (address, address, address, uint8, uint8, uint8)",
+            "function wins(address) public view returns (uint256)"
+        ];
+
+        let provider, signer, contract, userAddress;
+
+        // 1. Connect to MetaMask
+        document.getElementById("connectBtn").onclick = async () => {
+            if (window.ethereum) {
+                await window.ethereum.request({ method: 'eth_requestAccounts' });
+                provider = new ethers.providers.Web3Provider(window.ethereum);
+                signer = provider.getSigner();
+                userAddress = await signer.getAddress();
+                document.getElementById("walletAddress").innerText = userAddress;
+                
+                contract = new ethers.Contract(contractAddress, contractABI, signer);
+                updateGameState();
+            } else {
+                alert("Please install MetaMask!");
+            }
+        };
+
+        // 2. Fetch game state from Blockchain
+        async function updateGameState() {
+            try {
+                const state = await contract.getGame();
+                document.getElementById("player1").innerText = state[0];
+                document.getElementById("player2").innerText = state[1];
+                document.getElementById("turnOwner").innerText = state[2];
+                document.getElementById("currentSum").innerText = state[3];
+                document.getElementById("target").innerText = state[4];
+                
+                const statusCodes = ["Waiting for Player 2", "Active", "Finished"];
+                document.getElementById("gameStatus").innerText = statusCodes[state[5]];
+            } catch (error) {
+                console.error("Error loading game state:", error);
+            }
+        }
+
+        // 3. Contract Interactions
+        document.getElementById("createBtn").onclick = async () => {
+            const tx = await contract.createGame(21);
+            await tx.wait();
+            updateGameState();
+        };
+
+        document.getElementById("joinBtn").onclick = async () => {
+            const tx = await contract.joinGame();
+            await tx.wait();
+            updateGameState();
+        };
+
+        async function makeMove(amount) {
+            const tx = await contract.makeMove(amount);
+            await tx.wait();
+            updateGameState();
+        }
+
+        document.getElementById("add1Btn").onclick = () => makeMove(1);
+        document.getElementById("add2Btn").onclick = () => makeMove(2);
+        document.getElementById("add3Btn").onclick = () => makeMove(3);
+    </script>
+</body>
+</html>
